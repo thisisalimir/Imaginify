@@ -9,8 +9,10 @@ const uri = process.env.MONGODB_URL as string;
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET as string;
 
 let client: MongoClient | null = null;
+console.log("test Me0");
 
 async function connectToDatabase() {
+  console.log("test Me1");
   if (!client) {
     client = new MongoClient(uri);
     await client.connect();
@@ -20,6 +22,8 @@ async function connectToDatabase() {
 
 // Clerk Webhook: create or delete a user in the database by Clerk ID
 export async function POST(req: Request) {
+  console.log("test Me2");
+
   try {
     // Verify webhook secret
     const headerPayload = headers();
