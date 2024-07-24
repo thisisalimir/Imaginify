@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 import { MongoClient } from "mongodb";
 
 // MongoDB connection URI
-const uri = process.env.MONGODB_URI as string;
+const uri = process.env.MONGODB_URL as string;
 let client: MongoClient | null = null;
 
 async function connectToDatabase() {
