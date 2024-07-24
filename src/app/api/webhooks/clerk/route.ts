@@ -93,6 +93,8 @@ export async function POST(req: Request) {
       };
 
       const newUser = await usersCollection.insertOne(user);
+      console.log(newUser);
+
       return NextResponse.json({ message: "OK", user: newUser });
     }
     case "user.updated": {
