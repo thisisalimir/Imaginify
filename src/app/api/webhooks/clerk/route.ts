@@ -1,23 +1,9 @@
-/* eslint-disable camelcase */
 import { Webhook } from "svix";
 import { headers } from "next/headers";
 import { WebhookEvent } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
-import { MongoClient } from "mongodb";
-
-// MongoDB connection URI
-const uri = process.env.MONGODB_URI as string;
-let client: MongoClient | null = null;
-
-async function connectToDatabase() {
-  if (!client) {
-    client = new MongoClient(uri);
-    await client.connect();
-  }
-  return client.db("imaginify"); // Replace 'your-database-name' with the actual database name
-}
 
 export async function POST(req: Request) {
+  // You can find this in the Clerk Dashboard -> Webhooks -> choose the endpoint
   const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
 
   if (!WEBHOOK_SECRET) {
@@ -34,7 +20,7 @@ export async function POST(req: Request) {
 
   // If there are no headers, error out
   if (!svix_id || !svix_timestamp || !svix_signature) {
-    return new Response("Error occurred -- no svix headers", {
+    return new Response("Error occured -- no svix headers", {
       status: 400,
     });
   }
@@ -57,7 +43,7 @@ export async function POST(req: Request) {
     }) as WebhookEvent;
   } catch (err) {
     console.error("Error verifying webhook:", err);
-    return new Response("Error occurred", {
+    return new Response("Error occured", {
       status: 400,
     });
   }
@@ -66,62 +52,8 @@ export async function POST(req: Request) {
   // For this guide, you simply log the payload to the console
   const { id } = evt.data;
   const eventType = evt.type;
-  console.log(`Webhook with an ID of ${id} and type of ${eventType}`);
+  console.log(`Webhook with and ID of ${id} and type of ${eventType}`);
   console.log("Webhook body:", body);
 
-  const db = await connectToDatabase();
-  const usersCollection = db.collection("users");
-  console.log(db, usersCollection);
-
-  // Handle the event based on its type
-  switch (eventType) {
-    case "user.created": {
-      const {
-        id,
-        email_addresses,
-        image_url,
-        first_name,
-        last_name,
-        username,
-      } = evt.data;
-      const user = {
-        clerkId: id,
-        email: email_addresses[0].email_address,
-        username: username!,
-        firstName: first_name ?? "",
-        lastName: last_name ?? "",
-        photo: image_url,
-      };
-
-      const newUser = await usersCollection.insertOne(user);
-      console.log(newUser);
-
-      return NextResponse.json({ message: "OK", user: newUser });
-    }
-    case "user.updated": {
-      const { id, image_url, first_name, last_name, username } = evt.data;
-      const user = {
-        firstName: first_name ?? "",
-        lastName: last_name ?? "",
-        username: username!,
-        photo: image_url,
-      };
-
-      const updatedUser = await usersCollection.updateOne(
-        { clerkId: id },
-        { $set: user }
-      );
-
-      return NextResponse.json({ message: "OK", user: updatedUser });
-    }
-    case "user.deleted": {
-      const { id } = evt.data;
-      const deletedUser = await usersCollection.deleteOne({ clerkId: id });
-
-      return NextResponse.json({ message: "OK", user: deletedUser });
-    }
-    default:
-      console.log(`Unhandled event type: ${eventType}`);
-      return new Response("", { status: 200 });
-  }
+  return new Response("", { status: 200 });
 }
