@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 import { MongoClient } from "mongodb";
 
 // MongoDB connection URI
-const uri = process.env.MONGODB_URL as string;
+const uri = process.env.MONGODB_URI as string;
 let client: MongoClient | null = null;
 
 async function connectToDatabase() {
@@ -14,7 +14,7 @@ async function connectToDatabase() {
     client = new MongoClient(uri);
     await client.connect();
   }
-  return client.db("imaginify");
+  return client.db("imaginify"); // Replace 'your-database-name' with the actual database name
 }
 
 export async function POST(req: Request) {
@@ -32,12 +32,14 @@ export async function POST(req: Request) {
   const svix_timestamp = headerPayload.get("svix-timestamp");
   const svix_signature = headerPayload.get("svix-signature");
 
+  // If there are no headers, error out
   if (!svix_id || !svix_timestamp || !svix_signature) {
     return new Response("Error occurred -- no svix headers", {
       status: 400,
     });
   }
 
+  // Get the body
   const payload = await req.json();
   const body = JSON.stringify(payload);
 
@@ -46,6 +48,7 @@ export async function POST(req: Request) {
 
   let evt: WebhookEvent;
 
+  // Verify the payload with the headers
   try {
     evt = wh.verify(body, {
       "svix-id": svix_id,
@@ -59,62 +62,63 @@ export async function POST(req: Request) {
     });
   }
 
-  // Get the ID and type
+  // Do something with the payload
+  // For this guide, you simply log the payload to the console
   const { id } = evt.data;
   const eventType = evt.type;
+  console.log(`Webhook with an ID of ${id} and type of ${eventType}`);
+  console.log("Webhook body:", body);
 
   const db = await connectToDatabase();
   const usersCollection = db.collection("users");
 
-  // CREATE
-  if (eventType === "user.created") {
-    const { id, email_addresses, image_url, first_name, last_name, username } =
-      evt.data;
+  // Handle the event based on its type
+  switch (eventType) {
+    case "user.created": {
+      const {
+        id,
+        email_addresses,
+        image_url,
+        first_name,
+        last_name,
+        username,
+      } = evt.data;
+      const user = {
+        clerkId: id,
+        email: email_addresses[0].email_address,
+        username: username!,
+        firstName: first_name ?? "",
+        lastName: last_name ?? "",
+        photo: image_url,
+      };
 
-    const user = {
-      clerkId: id,
-      email: email_addresses[0].email_address,
-      username: username!,
-      firstName: first_name ?? "",
-      lastName: last_name ?? "",
-      photo: image_url,
-    };
+      const newUser = await usersCollection.insertOne(user);
+      return NextResponse.json({ message: "OK", user: newUser });
+    }
+    case "user.updated": {
+      const { id, image_url, first_name, last_name, username } = evt.data;
+      const user = {
+        firstName: first_name ?? "",
+        lastName: last_name ?? "",
+        username: username!,
+        photo: image_url,
+      };
 
-    const newUser = await usersCollection.insertOne(user);
+      const updatedUser = await usersCollection.updateOne(
+        { clerkId: id },
+        { $set: user }
+      );
 
-    return NextResponse.json({ message: "OK", user: newUser });
+      return NextResponse.json({ message: "OK", user: updatedUser });
+    }
+    case "user.deleted": {
+      const { id } = evt.data;
+      const deletedUser = await usersCollection.deleteOne({ clerkId: id });
+
+      return NextResponse.json({ message: "OK", user: deletedUser });
+    }
+    default:
+      console.log(`Unhandled event type: ${eventType}`);
+      return new Response("", { status: 200 });
   }
-
-  // UPDATE
-  if (eventType === "user.updated") {
-    const { id, image_url, first_name, last_name, username } = evt.data;
-
-    const user = {
-      firstName: first_name ?? "",
-      lastName: last_name ?? "",
-      username: username!,
-      photo: image_url,
-    };
-
-    const updatedUser = await usersCollection.updateOne(
-      { clerkId: id },
-      { $set: user }
-    );
-
-    return NextResponse.json({ message: "OK", user: updatedUser });
-  }
-
-  // DELETE
-  if (eventType === "user.deleted") {
-    const { id } = evt.data;
-
-    const deletedUser = await usersCollection.deleteOne({ clerkId: id });
-
-    return NextResponse.json({ message: "OK", user: deletedUser });
-  }
-
-  console.log(`Webhook with an ID of ${id} and type of ${eventType}`);
-  console.log("Webhook body:", body);
-
-  return new Response("", { status: 200 });
 }
