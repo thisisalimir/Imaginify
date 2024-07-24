@@ -3,8 +3,19 @@ import { Webhook } from "svix";
 import { headers } from "next/headers";
 import { WebhookEvent } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { MongoClient } from "mongodb";
 
-import { createUser, deleteUser, updateUser } from "@/lib/actions/user.actions";
+// MongoDB connection URI
+const uri = process.env.MONGODB_URL as string;
+let client: MongoClient | null = null;
+
+async function connectToDatabase() {
+  if (!client) {
+    client = new MongoClient(uri);
+    await client.connect();
+  }
+  return client.db("IMAGINIFY");
+}
 
 export async function POST(req: Request) {
   const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
@@ -52,6 +63,9 @@ export async function POST(req: Request) {
   const { id } = evt.data;
   const eventType = evt.type;
 
+  const db = await connectToDatabase();
+  const usersCollection = db.collection("users");
+
   // CREATE
   if (eventType === "user.created") {
     const { id, email_addresses, image_url, first_name, last_name, username } =
@@ -66,7 +80,7 @@ export async function POST(req: Request) {
       photo: image_url,
     };
 
-    const newUser = await createUser(user);
+    const newUser = await usersCollection.insertOne(user);
 
     return NextResponse.json({ message: "OK", user: newUser });
   }
@@ -82,7 +96,10 @@ export async function POST(req: Request) {
       photo: image_url,
     };
 
-    const updatedUser = await updateUser(id, user);
+    const updatedUser = await usersCollection.updateOne(
+      { clerkId: id },
+      { $set: user }
+    );
 
     return NextResponse.json({ message: "OK", user: updatedUser });
   }
@@ -91,7 +108,7 @@ export async function POST(req: Request) {
   if (eventType === "user.deleted") {
     const { id } = evt.data;
 
-    const deletedUser = await deleteUser(id!);
+    const deletedUser = await usersCollection.deleteOne({ clerkId: id });
 
     return NextResponse.json({ message: "OK", user: deletedUser });
   }
