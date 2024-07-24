@@ -71,6 +71,7 @@ export async function POST(req: Request) {
 
   const db = await connectToDatabase();
   const usersCollection = db.collection("users");
+  console.log(db, usersCollection);
 
   // Handle the event based on its type
   switch (eventType) {
