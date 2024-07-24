@@ -14,7 +14,7 @@ async function connectToDatabase() {
     client = new MongoClient(uri);
     await client.connect();
   }
-  return client.db("IMAGINIFY");
+  return client.db("imaginify");
 }
 
 export async function POST(req: Request) {
